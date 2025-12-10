@@ -1,4 +1,4 @@
-module fir4_CLA_u #(parameter w=16)(
+module fir4_Carry_Skip_Adder_u #(parameter w=16)(
   input                      clk, 
                              reset,
   input         [w-1:0] a,
