@@ -144,8 +144,12 @@ mFcellL mF5 (clk,rst_n,oi[5],ni[5],nd[5],oo[5],no[5],sd[5]);	  // special final 
 assign no[0] = dI; 	         // fresh data to sorting stack
 assign oo[0] = dff[4];	     // 4-cycle delay; old data to be removed from sorting stack
 assign nd[5] = oo[5]; 	     // special end case 
-assign tap   = sd[3];	     // output median of the 5 most recent samples
- 
+	
+// --------- NEW LINES (MEAN COMPUTATION) ---------- // For mean Filter
+logic [10:0] mean_sum;
+assign mean_sum = sd[1] + sd[2] + sd[3] + sd[4] + sd[5];
+assign tap      = mean_sum / 5;
+// -----------------------------------------------
 genvar kx; 
 generate
   for(kx=1;kx<6;kx++) begin :hookup_loop
