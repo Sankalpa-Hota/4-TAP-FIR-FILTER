@@ -17,7 +17,7 @@ module project_tb2_u;
 // device under test goes here
 // choose "tree," "cascade," "CSA," or other topology
 //  fir4rca_cas_u #(.w(w)) f1(.*);
-  fir4c_fig11_42 #(.w(w)) f1(.*);
+  fir4_Carry_Skip_Adder_u #(.w(w)) f1(.*);
 
   always begin			           	  // tick ... tock 
     #5ns clk = 'b1;
@@ -54,5 +54,6 @@ module project_tb2_u;
 
   assign dif1 = s - s_b1;		  // discrepancy calculator
 endmodule
+
 
 
