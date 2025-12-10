@@ -1,7 +1,3 @@
-// ECE260A Lab 3
-// keep the same input and output and the same input and output registers
-// change the combinational addition part to something more optimal
-// refer to Fig. 11.42(a) in W&H 
 module fir4_CLA_u #(parameter w=16)(
   input                      clk, 
                              reset,
@@ -11,40 +7,90 @@ module fir4_CLA_u #(parameter w=16)(
   logic         [w-1:0] ar, br, cr, dr;
 
 // ==========================
-// CARRY LOOKAHEAD ADDER
+// TRUE CARRY LOOKAHEAD ADDER
 // ==========================
-// Uses propagate/generate logic to reduce carry chain depth
-// aster than RCA by constant factor, not asymptotic improvement.
+// Hierarchical CLA with group propagate & generate
+// Reduces carry dependency depth vs RCA
+// ==========================
 
-logic [w-1:0] p1, g1, p2, g2;
-logic [w  :0] c1, c2;
+localparam int B  = 4;               // block size
+localparam int NB = (w + B - 1) / B; // number of blocks
+
+logic [w-1:0] p1, g1, p2, g2;        // bit propagate / generate
+logic [NB-1:0] Pg1, Gg1, Pg2, Gg2;   // group propagate / generate
+logic [w:0] c1, c2;                 // bit-level carries
+logic [NB:0] Cg1, Cg2;              // group-level carries
+
+logic [w-1:0] sum1, sum2;
 logic [w+1:0] sum;
 
 always_comb begin
-  // Generate & propagate for ar + br
+  // --------------------------
+  // Bit-level propagate & generate
+  // --------------------------
   for (int i = 0; i < w; i++) begin
     p1[i] = ar[i] ^ br[i];
     g1[i] = ar[i] & br[i];
-  end
-
-  c1[0] = 1'b0;
-  for (int i = 0; i < w; i++)
-    c1[i+1] = g1[i] | (p1[i] & c1[i]);
-
-  // Generate & propagate for cr + dr
-  for (int i = 0; i < w; i++) begin
     p2[i] = cr[i] ^ dr[i];
     g2[i] = cr[i] & dr[i];
   end
 
-  c2[0] = 1'b0;
-  for (int i = 0; i < w; i++)
-    c2[i+1] = g2[i] | (p2[i] & c2[i]);
+  // --------------------------
+  // Group propagate & generate
+  // --------------------------
+  for (int b = 0; b < NB; b++) begin
+    Pg1[b] = 1'b1;
+    Gg1[b] = 1'b0;
+    Pg2[b] = 1'b1;
+    Gg2[b] = 1'b0;
 
-  // Final sum
-  sum = {c1[w], p1 ^ c1[w-1:0]} + {c2[w], p2 ^ c2[w-1:0]};
+    for (int i = 0; i < B; i++) begin
+      int idx = b*B + i;
+      if (idx < w) begin
+        Gg1[b] |= g1[idx] & Pg1[b];
+        Pg1[b] &= p1[idx];
+
+        Gg2[b] |= g2[idx] & Pg2[b];
+        Pg2[b] &= p2[idx];
+      end
+    end
+  end
+
+  // --------------------------
+  // Group-level carry lookahead
+  // --------------------------
+  Cg1[0] = 1'b0;
+  Cg2[0] = 1'b0;
+
+  for (int b = 0; b < NB; b++) begin
+    Cg1[b+1] = Gg1[b] | (Pg1[b] & Cg1[b]);
+    Cg2[b+1] = Gg2[b] | (Pg2[b] & Cg2[b]);
+  end
+
+  // --------------------------
+  // Bit-level carry resolution
+  // --------------------------
+  for (int b = 0; b < NB; b++) begin
+    c1[b*B] = Cg1[b];
+    c2[b*B] = Cg2[b];
+
+    for (int i = 0; i < B; i++) begin
+      int idx = b*B + i;
+      if (idx < w) begin
+        c1[idx+1] = g1[idx] | (p1[idx] & c1[idx]);
+        c2[idx+1] = g2[idx] | (p2[idx] & c2[idx]);
+
+        sum1[idx] = p1[idx] ^ c1[idx];
+        sum2[idx] = p2[idx] ^ c2[idx];
+      end
+    end
+  end
+
+  // --------------------------
+  // Final sum (unchanged intent)
+  // --------------------------
+  sum = {c1[w], sum1} + {c2[w], sum2};
 end
-
 
 // sequential logic -- standardized for everyone
   always_ff @(posedge clk)			// or just always -- always_ff tells tools you intend D flip flops
