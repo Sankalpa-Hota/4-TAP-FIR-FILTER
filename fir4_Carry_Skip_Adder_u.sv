@@ -1,8 +1,3 @@
-// ECE260A Lab 3
-// keep the same input and output and the same input and output registers
-// change the combinational addition part to something more optimal
-// refer to Fig. 11.42(a) in W&H
-
 module fir4_CLA_u #(parameter w=16)(
   input                      clk, 
                              reset,
