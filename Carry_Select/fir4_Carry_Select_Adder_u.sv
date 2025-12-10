@@ -1,6 +1,6 @@
 
 // FIR module with Carry Select Adder replacing Ripple Carry
-module fir4csa_u #(parameter w=16)(
+module fir4_Carry_Select_Adder_u #(parameter w=16)(
   input                     clk,
                             reset,
   input         [w-1:0]    a,
