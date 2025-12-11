@@ -1,0 +1,7 @@
+Early Power Estimator File Generator Status : Successful - Fri Dec 12 04:53:19 2025
+Quartus Prime Version : 20.1.0 Build 711 06/05/2020 SJ Lite Edition
+Revision Name : fir4_Carry_Skip_Adder_u
+Top-level Entity Name : fir4_Carry_Skip_Adder_u
+Family : Cyclone V
+Device : 5CSXFC6D6F31I7ES
+Power Estimation Confidence : Low: user provided insufficient toggle rate data

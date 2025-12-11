@@ -1,0 +1,18 @@
+Power Analyzer Status : Successful - Fri Dec 12 04:31:30 2025
+Quartus Prime Version : 20.1.0 Build 711 06/05/2020 SJ Lite Edition
+Revision Name : fir4_CLA_u
+Top-level Entity Name : fir4_CLA_u
+Family : Cyclone V
+Device : 5CSXFC6D6F31I7ES
+Power Models : Final
+Total FPGA Thermal Power Dissipation : 425.90 mW
+Core Dynamic Thermal Power Dissipation : 0.00 mW
+Core Static Thermal Power Dissipation : 416.47 mW
+I/O Thermal Power Dissipation : 9.44 mW
+ :  
+HPS Dynamic (Dual core) Power : 841.75 mW
+HPS Dynamic (Single core) Power : 823.54 mW
+ :  
+Total FPGA and HPS Power : 1267.65 mW
+ :  
+Power Estimation Confidence : Low: user provided insufficient toggle rate data
