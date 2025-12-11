@@ -2,6 +2,8 @@
 // keep the same input and output and the same input and output registers
 // change the combinational addition part to something more optimal
 // refer to Fig. 11.42(a) in W&H 
+`timescale 1ns/1ps
+
 module fir4rca_u #(parameter w=16)(
   input                      clk, 
                              reset,
