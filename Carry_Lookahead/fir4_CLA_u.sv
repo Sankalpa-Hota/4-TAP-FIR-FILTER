@@ -1,94 +1,116 @@
 `timescale 1ns/1ps
-module fir4_CLA_u #(parameter w=16)(
-    input  signed [w-1:0] a,
-    input                 clk,
-    input                 reset,
-    output logic signed [w+1:0] s
+
+module fir4_Carry_Select_Adder_u #(parameter w = 16)(
+    input  logic                  clk,
+    input  logic                  reset,
+    input  logic signed [w-1:0]   a,
+    output logic signed [w+1:0]   s
 );
 
-    // pipeline delay registers: 4 last inputs
+    // pipeline regs
     logic signed [w-1:0] ar, br, cr, dr;
 
-    // partial sums (signed)
-    logic signed [w:0] sum1, sum2;
+    // CSA params
+    localparam int B  = 4;
+    localparam int NB = (w + B - 1) / B;
 
-    // propagate/generate
-    logic p1 [w:0], g1 [w:0];
-    logic p2 [w:0], g2 [w:0];
+    // intermediate partial sums (w+1 bits each)
+    logic signed [w:0] sum1; // ar+br result (w+1 bits)
+    logic signed [w:0] sum2; // cr+dr result (w+1 bits)
+    logic signed [w+1:0] sum_final; // final (w+2 bits)
 
-    // carries
-    logic c1 [w:0], c2 [w:0];
+    // temporaries used in combinational CSA
+    logic [B:0] blk_r0; // result for block with cin=0 (B+1 bits)
+    logic [B:0] blk_r1; // result for block with cin=1 (B+1 bits)
+    logic [B-1:0] A_blk, B_blk;
+    logic carry;
 
-    // final adder (signed, w+2 bits)
-    logic signed [w+1:0] sum1_ext, sum2_ext;
-    logic p3 [w+1:0], g3 [w+1:0];
-    logic c3 [w+1:0];
-    logic signed [w+1:0] sum_comb;
-
-    // -----------------------------------------
-    // Combinational: perform (ar+br) + (cr+dr)
-    // -----------------------------------------
+    // ----------------------------
+    // combinational CSA (block-wise using vector add)
+    // ----------------------------
     always_comb begin
+        // Initialize to avoid X propagation
+        sum1 = '0;
+        sum2 = '0;
+        sum_final = '0;
 
-        // ------------------------
-        // First CLA: sum1 = ar + br
-        // ------------------------
-        c1[0] = 1'b0;
-        for(int i=0; i<w; i++) begin
-            p1[i] = ar[i] ^ br[i];
-            g1[i] = ar[i] & br[i];
-            c1[i+1] = g1[i] | (p1[i] & c1[i]);
-            sum1[i] = p1[i] ^ c1[i];
+        // -------------------- compute sum1 = ar + br --------------------
+        carry = 1'b0;
+        for (int b = 0; b < NB; b++) begin
+            int base = b * B;
+            int len = (w - base >= B) ? B : (w - base); // number of valid bits in this block
+
+            // zero-extend A_blk/B_blk and copy len bits into LSBs
+            A_blk = '0;
+            B_blk = '0;
+            if (len > 0) begin
+                A_blk[0 +: len] = ar[base +: len];
+                B_blk[0 +: len] = br[base +: len];
+            end
+
+            // compute block results as small integer additions (width = len, but we'll compute on B)
+            // form operands as (B+1)-bit unsigned for addition: {1'b0, A_blk} + {1'b0, B_blk} + cin
+            // Note: we compute full B+1 width results and then take LSB len bits to place
+            blk_r0 = {1'b0, A_blk} + {1'b0, B_blk} + 1'b0;
+            blk_r1 = {1'b0, A_blk} + {1'b0, B_blk} + 1'b1;
+
+            // select based on carry (carry is 0 or 1)
+            if (len > 0) begin
+                // place only len LSBs into sum1
+                sum1[base +: len] = (carry == 1'b0) ? blk_r0[0 +: len] : blk_r1[0 +: len];
+            end
+            // update carry = chosen block's MSB (blk_rX[B])
+            carry = (carry == 1'b0) ? blk_r0[B] : blk_r1[B];
         end
-        sum1[w] = c1[w]; // sign extension bit from CLA
+        // top carry becomes MSB of sum1
+        sum1[w] = carry;
 
-        // ------------------------
-        // Second CLA: sum2 = cr + dr
-        // ------------------------
-        c2[0] = 1'b0;
-        for(int i=0; i<w; i++) begin
-            p2[i] = cr[i] ^ dr[i];
-            g2[i] = cr[i] & dr[i];
-            c2[i+1] = g2[i] | (p2[i] & c2[i]);
-            sum2[i] = p2[i] ^ c2[i];
+        // -------------------- compute sum2 = cr + dr --------------------
+        carry = 1'b0;
+        for (int b = 0; b < NB; b++) begin
+            int base = b * B;
+            int len = (w - base >= B) ? B : (w - base);
+
+            A_blk = '0;
+            B_blk = '0;
+            if (len > 0) begin
+                A_blk[0 +: len] = cr[base +: len];
+                B_blk[0 +: len] = dr[base +: len];
+            end
+
+            blk_r0 = {1'b0, A_blk} + {1'b0, B_blk} + 1'b0;
+            blk_r1 = {1'b0, A_blk} + {1'b0, B_blk} + 1'b1;
+
+            if (len > 0) begin
+                sum2[base +: len] = (carry == 1'b0) ? blk_r0[0 +: len] : blk_r1[0 +: len];
+            end
+            carry = (carry == 1'b0) ? blk_r0[B] : blk_r1[B];
         end
-        sum2[w] = c2[w];
+        sum2[w] = carry;
 
-        // ------------------------------------
-        // SIGN-EXTEND BOTH partial sums to w+2
-        // ------------------------------------
-        sum1_ext = { sum1[w], sum1 };
-        sum2_ext = { sum2[w], sum2 };
-
-        // ------------------------------------
-        // Final CLA: (w+2)-bit signed add
-        // ------------------------------------
-        c3[0] = 1'b0;
-        for(int i=0; i<w+2; i++) begin
-            p3[i] = sum1_ext[i] ^ sum2_ext[i];
-            g3[i] = sum1_ext[i] & sum2_ext[i];
-            c3[i+1] = g3[i] | (p3[i] & c3[i]);
-            sum_comb[i] = p3[i] ^ c3[i];
-        end
-        sum_comb[w+1] = c3[w+1];
+        // -------------------- final signed addition --------------------
+        // sign-extend each (they are w+1 bits) into w+2 and add signed
+        sum_final = $signed({ sum1[w], sum1 }) + $signed({ sum2[w], sum2 });
     end
 
-    // -----------------------------------------
-    // Registers (pipeline of 4 inputs)
-    // -----------------------------------------
+    // ----------------------------
+    // pipeline registers (single driver for 's')
+    // ----------------------------
     always_ff @(posedge clk) begin
-        if(reset) begin
-            ar <= 0;
-            br <= 0;
-            cr <= 0;
-            dr <= 0;
-            s  <= 0;
+        if (reset) begin
+            ar <= '0;
+            br <= '0;
+            cr <= '0;
+            dr <= '0;
+            s  <= '0;
         end else begin
             ar <= a;
             br <= ar;
             cr <= br;
             dr <= cr;
-            s  <= sum_comb;
+
+            // register final sum, single driver
+            s <= sum_final;
         end
     end
 

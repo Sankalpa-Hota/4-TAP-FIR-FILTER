@@ -1,6 +1,7 @@
 // testbench for 4-tap, w-bit, signed averaging FIR filter
 // ECE260A Lab 3 assignment   2025
 // change parameter w to experiment wih wider operand vectors, such as 16 bits
+`timescale 1ns/1ps
 module project_tb2_u;
   parameter           w     = 16;	  // operand bit width
   logic               clk   = 'b0,			          
